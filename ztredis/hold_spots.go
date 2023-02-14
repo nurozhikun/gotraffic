@@ -3,7 +3,6 @@ package ztredis
 import (
 	"errors"
 	"gotraffic/ztpbf"
-	"njrobot/robpbf"
 	"strconv"
 	"strings"
 
@@ -64,17 +63,16 @@ func (p *Pool) LockSpots(req *ztpbf.ReqPathSpots) (res *ztpbf.ReqPathSpots, err 
 	return req, nil
 }
 
-func (r *RdsTraffic) UnLockAllSpots(robotid int32) (res *robpbf.RequestPathSpots, err error) {
-	req := &robpbf.RequestPathSpots{Robotid: robotid}
-	req.Command = 1
-	req.Seconds = 90
-	return r.LockSpots(req)
+func (p *Pool) UnLockAllSpots(robotid string) (res *ztpbf.ReqPathSpots, err error) {
+	req := &ztpbf.ReqPathSpots{RobotId: robotid}
+	req.ExpireSeconds = 90
+	return p.LockSpots(req)
 }
 
 // exceptKeys 包含spots.的前缀
-func (r *RdsTraffic) UnlockSpotsExceptAndResetTraffic(robotid int32, exceptKeys ...string) (int, error) {
+func (p *Pool) UnlockSpotsExceptAndResetTraffic(robotid string, exceptKeys ...string) (int, error) {
 	script := redis.NewScript(len(exceptKeys), LuaUnlockKeysExceptAndResetTraffic)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	para := make([]interface{}, 0, 1+len(exceptKeys))
 	for _, v := range exceptKeys {
@@ -90,9 +88,9 @@ func (r *RdsTraffic) UnlockSpotsExceptAndResetTraffic(robotid int32, exceptKeys 
 }
 
 // LockAttachSpotsOfRotates() keys are rotates, only one mostly
-func (r *RdsTraffic) LockAttachSpotsOfRotates(value interface{}, secs int, keys ...string) (int, error) {
+func (p *Pool) LockAttachSpotsOfRotates(value interface{}, secs int, keys ...string) (int, error) {
 	script := redis.NewScript(len(keys), LuaLockAttachSpotsOfRotates)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	para := make([]interface{}, 0, 2+len(keys))
 	for _, v := range keys {
@@ -107,9 +105,9 @@ func (r *RdsTraffic) LockAttachSpotsOfRotates(value interface{}, secs int, keys 
 	return ret, nil
 }
 
-func (r *RdsTraffic) UnlockRotateAttachSpots(robotid int32) (int, error) {
+func (p *Pool) UnlockRotateAttachSpots(robotid int32) (int, error) {
 	script := redis.NewScript(0, LuaUnlockRotateAttachSpots)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	ret, err := redis.Int(script.Do(conn, robotid))
 	if nil != err {
@@ -118,9 +116,9 @@ func (r *RdsTraffic) UnlockRotateAttachSpots(robotid int32) (int, error) {
 	return ret, nil
 }
 
-func (r *RdsTraffic) ReadHoldenResources() (map[string]string, error) {
+func (p *Pool) ReadHoldenResources() (map[string]string, error) {
 	script := redis.NewScript(0, LuaReadHoldenResources)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	ret, err := redis.StringMap(script.Do(conn))
 	if nil != err {
@@ -129,9 +127,9 @@ func (r *RdsTraffic) ReadHoldenResources() (map[string]string, error) {
 	return ret, nil
 }
 
-func (r *RdsTraffic) ReadAskedResources() (map[string]string, error) {
+func (p *Pool) ReadAskedResources() (map[string]string, error) {
 	script := redis.NewScript(0, LuaReadAskedResources)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	ret, err := redis.StringMap(script.Do(conn))
 	if nil != err {
@@ -140,9 +138,9 @@ func (r *RdsTraffic) ReadAskedResources() (map[string]string, error) {
 	return ret, nil
 }
 
-func (r *RdsTraffic) LockedKeys(value interface{}, secs int, keys ...string) (int, error) {
+func (p *Pool) LockedKeys(value interface{}, secs int, keys ...string) (int, error) {
 	script := redis.NewScript(len(keys), LuaLockKeys)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	para := make([]interface{}, 0, 2+len(keys))
 	for _, v := range keys {
@@ -157,9 +155,9 @@ func (r *RdsTraffic) LockedKeys(value interface{}, secs int, keys ...string) (in
 }
 
 // HoldOneResource try to hold the resource for robotids
-func (r *RdsTraffic) HoldOneResource(code string, maxnum int, secs int, robotids ...string) (ids []string, err error) {
+func (p *Pool) HoldOneResource(code string, maxnum int, secs int, robotids ...string) (ids []string, err error) {
 	script := redis.NewScript(len(robotids), LuaHoldResource)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	para := make([]interface{}, 0, 3+len(robotids))
 	for _, v := range robotids {
@@ -173,9 +171,9 @@ func (r *RdsTraffic) HoldOneResource(code string, maxnum int, secs int, robotids
 	return ret, nil
 }
 
-func (r *RdsTraffic) GetCandidateOfResourceHolder(code string, robotids ...string) (ids []string, err error) {
+func (p *Pool) GetCandidateOfResourceHolder(code string, robotids ...string) (ids []string, err error) {
 	script := redis.NewScript(len(robotids), LuaGetCandidateOfResourceHolder)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	para := make([]interface{}, 0, 1+len(robotids))
 	for _, v := range robotids {
@@ -189,8 +187,8 @@ func (r *RdsTraffic) GetCandidateOfResourceHolder(code string, robotids ...strin
 	return ret, nil
 }
 
-func (r *RdsTraffic) ReleaseResourcesUnholdenRobots(resRobs map[string]string) error {
-	conn := r.Get()
+func (p *Pool) ReleaseResourcesUnholdenRobots(resRobs map[string]string) error {
+	conn := p.Get()
 	defer conn.Close()
 	// 获取redis内资源点
 	keys, err := redis.Strings(conn.Do("KEYS", "resource.*"))
@@ -236,8 +234,8 @@ func (r *RdsTraffic) ReleaseResourcesUnholdenRobots(resRobs map[string]string) e
 }
 
 // ReleaseResourcesUnholden() release un asked resources in redis
-func (r *RdsTraffic) ReleaseResourcesUnholden(robRes map[int][]string) error {
-	conn := r.Get()
+func (p *Pool) ReleaseResourcesUnholden(robRes map[int][]string) error {
+	conn := p.Get()
 	defer conn.Close()
 	//...
 	keys, err := redis.Strings(conn.Do("KEYS", "resources.holdby.*"))
@@ -285,9 +283,9 @@ func (r *RdsTraffic) ReleaseResourcesUnholden(robRes map[int][]string) error {
 }
 
 // FreeUnholdRobotOfResources ...
-func (r *RdsTraffic) FreeUnholdRobotOfResources() (resHoldenRobots []string, err error) {
+func (p *Pool) FreeUnholdRobotOfResources() (resHoldenRobots []string, err error) {
 	script := redis.NewScript(0, LuaFreeRobotInHoldenResourece)
-	conn := r.Get()
+	conn := p.Get()
 	defer conn.Close()
 	resHoldenRobots, err = redis.Strings(script.Do(conn))
 	if nil != err {
@@ -296,8 +294,8 @@ func (r *RdsTraffic) FreeUnholdRobotOfResources() (resHoldenRobots []string, err
 	return
 }
 
-func (r *RdsTraffic) ReadNoparkingSpots() ([]string, error) {
-	conn := r.Get()
+func (p *Pool) ReadNoparkingSpots() ([]string, error) {
+	conn := p.Get()
 	defer conn.Close()
 	bytesList, err := redis.ByteSlices(conn.Do("HGETALL", "noparking.spots"))
 	if nil != err {
@@ -312,8 +310,8 @@ func (r *RdsTraffic) ReadNoparkingSpots() ([]string, error) {
 	return strList, nil
 }
 
-func (r *RdsTraffic) ReadRotateSpotBorders(rotateSpot string) ([]string, error) {
-	conn := r.Get()
+func (p *Pool) ReadRotateSpotBorders(rotateSpot string) ([]string, error) {
+	conn := p.Get()
 	defer conn.Close()
 	key := "rotate.borders." + rotateSpot
 	borders, err := redis.Strings(conn.Do("SMEMBERS", key))
@@ -324,20 +322,20 @@ func (r *RdsTraffic) ReadRotateSpotBorders(rotateSpot string) ([]string, error) 
 	return borders, nil
 }
 
-func (r *RdsTraffic) GetLiftFloor(code string) (floor int, err error) {
+func (p *Pool) GetLiftFloor(code string) (floor int, err error) {
+	conn := p.Get()
+	defer conn.Close()
 	key := "resourceInfo." + code
 	field := "floor"
 	var floors []int
-	floors, err = r.ReadHashIntValues(key, field)
+	floors, err = conn.ReadHashIntValues(key, field)
 	if nil != err {
 		return
 	}
-
 	if len(floors) == 0 {
 		err = errors.New("No floor value get from redis")
 		return
 	}
-
 	floor = floors[0]
 	return
 }

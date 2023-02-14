@@ -1,12 +1,15 @@
-package redistraffic
+package ztredis
 
 import (
-	"nj.gitlab.com/nj-tools/zkredis"
-	"njrobot/robpbf"
+	"gotraffic/ztpbf"
+	"strconv"
 	"testing"
+
+	"gitee.com/sienectagv/gozk/zredis"
 )
 
-/**
+/*
+*
 1. 点位占用之非停靠点测试:
 设置p4, p5为非停靠点
 robot1：  p1 → p2 → p3 → p4 → p5 → p6 → p7 → p8
@@ -38,7 +41,8 @@ func TestSpotOccupy_NoParkingSpots(t *testing.T) {
 	}
 }
 
-/**
+/*
+*
 2. 点位占用之全路径测试
 全路径设置：p4为起点，p8为终点
 robot1：  p1 → p2 → p3 → p4 → p5 → p6 → p7 → p8
@@ -72,7 +76,8 @@ func TestSpotOccupy_HoldAllSpots(t *testing.T) {
 	}
 }
 
-/**
+/*
+*
 3. 点位占用之全路径+非停靠点测试
 全路径设置：p4为起点，p8为终点
 非停靠点设置：p3, p8
@@ -112,31 +117,32 @@ func TestSpotOccupy_HoldAllSpotsAndNoParkingSpot(t *testing.T) {
 	}
 }
 
-/**
+/*
+*
 4. 点位占用之双向路径 + 邻近点测试
 
 地图为：
-         								 p27
-        								  ↑
-        								 p26        p44
-        								  ↑          ↑
-        								 p25        p43
-        								  ↑          ↑
-        								 p24        p42
-        									↑          ↑
-        								 p23        p41
-                          ↑          ↑
-     p1 → p2 → p3 → p4 → p5 ←→ p6 ←→ p7 ←→ p8 ←→ p9 ←→ p10 ←→ p11 → p12 → p13
-                          ↑  					                         ↑
-                          ↓                                    ↓
-                         p31          	                      p22
-      				            ↑                                    ↑
-                          ↓                                    ↓
-                         p32                                  p21
-                          ↑                                    ↑
-                          ↓                                    ↓
-                         p33                                  p20
 
+	    								 p27
+	   								  ↑
+	   								 p26        p44
+	   								  ↑          ↑
+	   								 p25        p43
+	   								  ↑          ↑
+	   								 p24        p42
+	   									↑          ↑
+	   								 p23        p41
+	                     ↑          ↑
+	p1 → p2 → p3 → p4 → p5 ←→ p6 ←→ p7 ←→ p8 ←→ p9 ←→ p10 ←→ p11 → p12 → p13
+	                     ↑  					                         ↑
+	                     ↓                                    ↓
+	                    p31          	                      p22
+	 				            ↑                                    ↑
+	                     ↓                                    ↓
+	                    p32                                  p21
+	                     ↑                                    ↑
+	                     ↓                                    ↓
+	                    p33                                  p20
 
 邻近点设置：p22 -> p11
 robot1 : p4 -> p5 -> p6 -> p7 -> p8 -> p9 -> p10 -> p11 -> p12 - p13
@@ -186,7 +192,8 @@ func TestSpotOccupy_SsPathAndNearSpot(t *testing.T) {
 
 }
 
-/**
+/*
+*
 5.1. 点位占用之集合测试：插队功能
 
 全路径设置：  p42为起点，p44为终点
@@ -264,7 +271,8 @@ func TestSpotOccupy_MixtureAll_QueueJumper(t *testing.T) {
 	}
 }
 
-/**
+/*
+*
 5.2. 点位占用: 双向路径上有车停靠的情况
 
 robot1：  p8
@@ -344,7 +352,8 @@ func TestSpotOccupy_MixtureAll_RobotStopOnSS(t *testing.T) {
 	}
 }
 
-/**
+/*
+*
 5.3. 点位占用: 双向路径上有车通过的情况
 
 robot1：  p62 -> p7 -> p41 -> p42 -> p43 -> p44
@@ -432,7 +441,8 @@ func TestSpotOccupy_MixtureAll_RobotPassAcrossSS(t *testing.T) {
 	}
 }
 
-/**
+/*
+*
 5.4. 点位占用: 双向路径与全路径重合的情况
 
 robot1：  p21 -> p22 -> p11 -> p10 -> p9 -> p8 -> p7 → p41 -> p42 -> p43 -> p44
@@ -502,38 +512,45 @@ func assertHoldPathT(actualHoldPath, expectHoldPath []string) bool {
 }
 
 func holdPathT(robotid int, missionid int,
-	paths []string, rls *RdsTraffic) ([]string, error) {
-	req := &robpbf.RequestPathSpots{}
-	req.Robotid = int32(robotid)
-	req.Mapid = 0
-	req.Command = 1
-	req.Missionid = int32(missionid)
-	req.Seconds = 120
-	req.PathNamesLeft = append(req.PathNamesLeft, paths...)
+	paths []string, p *Pool) ([]string, error) {
+	// req := &robpbf.RequestPathSpots{}
+	req := &ztpbf.ReqPathSpots{}
+	req.RobotId = strconv.Itoa(robotid)
+	// req.Mapid = 0
+	// req.Command = 1
+	req.MissionId = strconv.Itoa(missionid)
+	req.ExpireSeconds = 120
+	req.PathSpotsLeft = append(req.PathSpotsLeft, paths...)
 	if len(paths) < 4 {
-		req.ReqSpotNames = paths
+		req.RequestSpots = paths
 	} else {
-		req.ReqSpotNames = paths[0:4]
+		req.RequestSpots = paths[0:4]
 	}
-	req.Agvtype = 1
+	req.AgvType = 1
 
-	res, err := rls.LockSpots(req)
+	res, err := p.LockSpots(req)
 	if nil != err {
 		return nil, err
 	}
-	return res.ReqSpotNames, nil
+	return res.RequestSpots, nil
 }
 
-func initialRedisT() *RdsTraffic {
-	rNode := &zkredis.RedisNode{}
-	rNode.Address = "127.0.0.1:6379"
-	rNode.MaxActive = 10
-	rNode.Password = "22222"
-	rNode.IdleTimeout = 120
-	rNode.SlaveAddress = "127.0.0.1:6379"
-	rls, _ := New(rNode)
-
-	return rls
+func initialRedisT() *Pool {
+	pool := &Pool{
+		Pool: zredis.NewPool("127.0.0.1:6379"),
+	}
+	pool.SetMaxActive(10)
+	pool.SetMaxIdle(10)
+	pool.SetIdleTime(120)
+	return pool
+	// rNode := &zkredis.RedisNode{}
+	// rNode.Address = "127.0.0.1:6379"
+	// rNode.MaxActive = 10
+	// rNode.Password = "22222"
+	// rNode.IdleTimeout = 120
+	// rNode.SlaveAddress = "127.0.0.1:6379"
+	// rls, _ := New(rNode)
+	// return rls
 }
 
 func TestTmpHoldPathsT(t *testing.T) {
