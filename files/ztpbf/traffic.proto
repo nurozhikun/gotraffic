@@ -4,22 +4,22 @@ package ztpbf;
 
 option optimize_for = LITE_RUNTIME;
 option java_package = "zktraffic.ztpbf";
-option go_package = "ztpbf";
+option go_package = "/ztpbf";
 
 //-->用于请求map spots点, request 和 response 是同一个结构
 message ReqPathSpots {
     string robot_id = 1;//请求的车辆ID,用字符串适合多系统并用
-    string mission_id = 2;
-    int32 expire_seconds = 3;
+    string mission_id = 2;//任务ID，仅仅显示
+    int32 expire_seconds = 3;//过期时间
     // int32 startstamp = 4;//seconds
     int32 agv_type = 5;//0 默认agv，1: iagv, 2 sagv(二维码车)
     repeated string path_spots_left = 6;//路径剩余点数，
-    repeated string request_spots = 7;//准备请求的点,能占用希望都占到，空的话表示要一次性请求到多有的点，请求到的点保存到这里更新
-    int32 req_min_count = 8;//一次性请求的点的个数,0表示没有限制，非0表示这些点需要一次性都请求到,没请求到，就退回。
+    repeated string request_spots = 7;//[in/out]准备请求的点,能占用希望都占到，空的话表示要一次性请求到多有的点，请求到的点保存到这里更新
+    int32 req_min_count = 8;//一次性请求的点的个数,0表示没有限制，非0表示这些点需要一次性都请求到,没请都求到，则回退到初始状态。
     // int32 map_id = 8;
     // repeated int32 req_spot_ids = 9;
     // int32 command = 11;//请求点位的指令
-    int32 finish_type = 12;//请求指令的完成状况
+    int32 finish_type = 12;//[out]请求指令的完成状况
     // int32 pathsLength = 13;//整条路径的长度
     // int32 pathIndex = 14;//目前车辆所在或者已走过点位的index;
     bool has_two_way = 13;//道路类型 0 全部是单向路径；1 有双向路径点
