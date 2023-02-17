@@ -37,12 +37,12 @@ func (m *Master) Run() {
 		m.waitGroup = zutils.NewLoopGroup()
 	}
 	if nil != m.app {
-		apiIris := ztapi.NewProtoApiParty("/api/v1", m.redisPool)
+		apiIris := ztapi.NewProtoApiParty("/api/", m.redisPool)
 		apiIris.InstallToApp(m.app)
 		//
 		m.waitGroup.AddAsyncBlock(
 			func() {
-				m.app.Listen("0.0.0.0:8080")
+				m.app.Listen("localhost:8080")
 			},
 			func() {
 				m.app.Shutdown(stdctx.TODO())

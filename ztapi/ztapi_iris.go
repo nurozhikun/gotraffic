@@ -4,6 +4,7 @@ import (
 	"gotraffic/ztpbf"
 	"gotraffic/ztredis"
 
+	"gitee.com/sienectagv/gozk/zlogger"
 	"gitee.com/sienectagv/gozk/zproto"
 	"gitee.com/sienectagv/gozk/zproto/zpbf"
 	"gitee.com/sienectagv/gozk/zutils"
@@ -39,6 +40,7 @@ type apiIris struct {
 // }
 
 func (ai *apiIris) ApiRequestPathSpots(h *zpbf.Header, req zproto.Message) (zproto.Message, error) {
+	zlogger.Info("api request path spots")
 	reqSpots, ok := req.(*ztpbf.ReqPathSpots)
 	if !ok {
 		return nil, zutils.ErrWrongReqBody
