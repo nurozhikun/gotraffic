@@ -13,6 +13,7 @@ import (
 type Master struct {
 	redisPool *ztredis.Pool
 	app       *iris.Application
+	appAddr   string
 	waitGroup *zutils.LoopGroup
 }
 
@@ -24,11 +25,14 @@ func (m *Master) InitRedisPool(p *zredis.Pool) error {
 	return nil
 }
 
-func (m *Master) InitIrisApp() error {
-	if nil != m.app {
-		return nil
+func (m *Master) InitIrisApp(addr string) error {
+	if nil == m.app {
+		m.app = iris.New()
 	}
-	m.app = iris.New()
+	m.appAddr = addr
+	if len(m.appAddr) == 0 {
+		m.appAddr = "localhost:8000" //default address
+	}
 	return nil
 }
 

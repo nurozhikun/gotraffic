@@ -1,6 +1,6 @@
 --[[全局变量，函数中可直接调用]]
 local stopbyrobot
---[[函数:找出占用的路径目的地关联哪些资源]]
+--[[函数:找出占用的路径目的地关联哪些资源，返回资源的ID map]]
 local func_check_pathendresource_asked = function(endspotname)
 	local asked = {}
 	local idx = 1
@@ -13,7 +13,7 @@ local func_check_pathendresource_asked = function(endspotname)
 	end
 	return asked
 end
---[[函数:判断这些资源是否都占用到了]]
+--[[函数:判断这些资源是否都占用到了,返回true or false]]
 local func_check_resources_holden = function(asked, robotid)
 	for i = 1, #asked do
 		if redis.call('SISMEMBER', 'resource.'..asked[i], robotid) ~= 1 then
@@ -22,7 +22,7 @@ local func_check_resources_holden = function(asked, robotid)
 	end
 	return true
 end
---[[函数：判断路径是否有一段需要一次性全部占用]]
+--[[函数：判断路径是否有一段需要一次性全部占用, ks是一条路径，返回路径中的第几个点到第几个点需要全路径占用]]
 local func_allholds_check_end = function(ks)
 	local ekeys = redis.call('KEYS', 'allhold.end.l.*')
 	for i = 1,#ekeys do

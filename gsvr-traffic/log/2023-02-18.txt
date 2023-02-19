@@ -1,0 +1,2 @@
+2023/02/18 22:59:32 main.go:21: {INFO} &{traffic {127.0.0.1:6379  0 0   root 123456} { 0.0.0.0:8080}}
+2023/02/18 22:59:32 proto_iris_api.go:93: {INFO} install api /api/ lockspots
