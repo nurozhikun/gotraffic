@@ -83,9 +83,9 @@ end
 --[[函数：spots.* key 的点位占用, return: 0没占成功；1新占到的点；2旧占到的点]]
 local func_lock_spot = function(spot, robotid, expire_time)
 	local key = 'spots.'..spot
-	if not redis.call('SET', key, robotid, 'NX','EX', expire_time) then
+	if not redis.call('SET', key, robotid, 'NX','EX', expire_time) then --[[这个点已经被占用了]]
 		local v = redis.call('GET',key)
-		if v == robotid then
+		if v == robotid then --[[被自己占用了，则更新过期时间]]
 			redis.call('SET', key, robotid,'EX', expire_time)
 			return 2
 		else
@@ -102,7 +102,7 @@ end
 local func_unlock_spot = function(spotkey)
 	redis.call('DEL', spotkey)
 end
---[[函数：]]
+--[[函数：释放点位，bAll=true：不管新老占用都释放，bAll=false：释放新占点位]]
 local func_unlock_newsetspot = function(tbl, bAll)
 	for k, v in pairs(tbl) do
 		if bAll or v == 1 then
@@ -150,13 +150,13 @@ local func_hold_sagv_spot = function(spot, robotid, expire_time)
 end
 --[[函数：获取robot path的长度]]
 local func_get_robot_path_len = function(robotid)
-	local ret = {}
-	local paths = redis.call('KEYS', 'robot.path.*')
+	local ret --[[{} Fixed:zhikun]]
+	local paths = redis.call('KEYS', 'robot.path.*') --[[遍历所有车辆的路径]]
 	for i = 1, #paths do
 		local srobid = string.sub(paths[i], 12)
 		if srobid == robotid then
-			local otherPath = redis.call('LRANGE', paths[i], 0, -1)
-			ret =  #otherPath
+			local otherPath = redis.call('LRANGE', paths[i], 0, -1) 
+			ret =  #otherPath --[[获取车辆的全部路径的长度]]
 			break
 		end
 	end
@@ -181,7 +181,7 @@ local func_extend_ss_seg = function(path, ss_start, ss_end)
 	last_index = ss_end
 
 	local path_seg_mark = {}
-	for i = 1, #path do
+	for i = 1, #path do --[[初始化字典]]
 		path_seg_mark[i] = 0
 	end
 
@@ -194,16 +194,16 @@ local func_extend_ss_seg = function(path, ss_start, ss_end)
 			-- [[若邻近点不在路径中，则跳过]]
 			if near_spot_index ~= 0 then
 				-- [[设置path_seg_mark]]
-				local path_spot_index = i
+				local path_spot_index = i --[[当前路径的index]]
 				local near_seg_start = path_spot_index
 				local near_seg_end = near_spot_index
-				if path_spot_index > near_spot_index then
+				if path_spot_index > near_spot_index then --[[seg_start > seg_end了，交换一下]]
 					near_seg_start = near_spot_index
 					near_seg_end = path_spot_index
 				end
 
 				for k = near_seg_start, near_seg_end do
-					path_seg_mark[k] = 1
+					path_seg_mark[k] = 1 --[[标记这是一组邻近点]]
 				end
 			end
 		end
@@ -237,11 +237,11 @@ local func_is_ss_valid  = function(path, first_index, last_index, orobid, srobid
 	local obstacle_robot_id
 
 	for index = first_index, last_index do
-		local robotid = redis.call('GET','spots.'..path[index])
+		local robotid = redis.call('GET','spots.'..path[index]) --[[若这个点没有小车点用，则返回的是 nil 吗 ???，这里的robotid可能是当前车辆]]
 		--[[若占用路径点小车的路径只有一个点，那么需要设置障碍]]
 		local pathLen = nil
 		pathLen = func_get_robot_path_len(robotid)
-		if pathLen ~= nil and pathLen == 1 then --[[若有车停在双向路径上]]
+		if pathLen ~= nil and pathLen == 1 then --[[若有车停在双向路径上,车辆不能进入]]
 			redis.call('HMSET', 'req.res.'..orobid, 'stopbyrobot', robotid, 'stopbyspot', path[index]) --[[存点位占用失败的时候，被阻挡的robotid到redis hash中]]
 			redis.call('HSET', 'stopspots', orobid, path[index])
 			ss_is_valid = 1
@@ -284,14 +284,14 @@ end
 local inRobotId = ARGV[1]
 local minHolds = tonumber(ARGV[3])--[[0表示整个路径都占用到]]
 local expireTime = ARGV[2]
-local holdalls = 0
-local holdalle = 0
+local holdalls = 0 --[[全路径占用的起点index]]
+local holdalle = 0 --[[全路径占用的终点index]]
 local holds
 local delToIdx = 1 --[[这个Idx本身不回滚删除,至少要占着一个点]]
 local hasAllHoldPath = false
 --[[保存车辆路径]]
 redis.call('DEL', 'robot.path.'..inRobotId) --[[先删除小车自己的path]]
-if #KEYS > 0 then
+if #KEYS > 0 then --[[保存新的路径]]
 	redis.call('RPUSH', 'robot.path.'..inRobotId, unpack(KEYS))
 end
 --[[redis.call('EXPIRE', 'robot.path.'..inRobotId, expireTime)]]
@@ -304,16 +304,16 @@ if minHolds ~= 0 then --[[不是全路径占用，判断是否有一段是需要
 	--[[最大可达无双向路径逆向干涉的点]]
 	local max_allow_point_for_ss = #KEYS
 	--[[检测双向路径的逆向干涉]]
-	redis.call('DEL', 'req.path.'..inRobotId) --[[先删除小车自己的path]]
+	redis.call('DEL', 'req.path.'..inRobotId) --[[先删除小车自己的path,免得逆向自己]]
 	redis.call('HDEL', 'ssobstacle', inRobotId)
 	if tonumber(ARGV[5]) == 1 then --[[如果指令要做逆向检查，并不是占有整个路径]]
-		local paths = redis.call('KEYS', 'req.path.*')
+		local paths = redis.call('KEYS', 'req.path.*') --[[所有车辆path keys，不包括当前车辆的路径了]]
 		local ss_obstacle_robid
 		for i = 1, #paths do
 			local srobid = string.sub(paths[i], 10)
 			local otherPath = redis.call('LRANGE', paths[i], 0, -1)
 			local is, ie = func_ss_check(KEYS, otherPath)
-			if ie > is then --[[ie是最后一个相等点，所以ie>is就可以了]]
+			if ie > is then --[[ie是最后一个相等点，所以ie>is就可以判断检测到逆向路径了]]
 				--[[根据邻近点信息扩展双向路径]]
 				local first_index, last_index
 				first_index, last_index = func_extend_ss_seg(KEYS, is, ie)
@@ -325,7 +325,7 @@ if minHolds ~= 0 then --[[不是全路径占用，判断是否有一段是需要
 				end
 			end
 		end
-		--[[记录双向路径的阻碍]]
+		--[[记录双向路径的阻碍，不走]]
 		if ss_obstacle_robid ~= nil then
 			redis.call('HSET', 'ssobstacle', inRobotId, ss_obstacle_robid)
 		end
@@ -337,9 +337,9 @@ if minHolds ~= 0 then --[[不是全路径占用，判断是否有一段是需要
 	end
 	--[[根据传入的最小占用路径点点数，依情况进行扩展]]
 	holds = minHolds
-	--[[如果当前点是禁止停车点，最后一个点位要向路径的后面推]]
+	--[[如果当前点是禁止停车点，最后一个点位要向路径的前面推进]]
 	holds = func_find_parking_spot(KEYS, holds, #KEYS)
-	--[[若已经向后推了,且推多了，则向前推]]
+	--[[若已经向前推进了,且进多了，则向后退]]
 	if holds > max_allow_point_for_ss then
 		holds = func_find_parking_spot(KEYS, max_allow_point_for_ss, 1)
 	end
@@ -351,9 +351,9 @@ if minHolds ~= 0 then --[[不是全路径占用，判断是否有一段是需要
 			holds = math.max(holds, holdalle)
 			--[[若全路径的最后一个点为禁止停靠点的处理]]
 			if holds > former_holds then
-				--[[如果当前点是禁止停车点，最后一个点位要向路径的后面推]]
+				--[[如果当前点是禁止停车点，最后一个点位要向路径的后面退]]
 				holds = func_find_parking_spot(KEYS, holds, #KEYS)
-				--[[若后推过的点过多超过允许的范围，或者后推的最后一个点依然为非停靠点，则需回退到iStart之前]]
+				--[[若后退过的点过多超过允许的范围，或者后退的最后一个点依然为非停靠点，则需回退到iStart之前]]
 				if holds > max_allow_point_for_ss or redis.call('SISMEMBER', 'noparking.spots', KEYS[holds]) == 1 then
 					holds = math.max(1,holdalls-1)
 					--[[继续排除非停靠点]]
