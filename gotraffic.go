@@ -46,7 +46,7 @@ func (m *Master) Run() {
 		//
 		m.waitGroup.AddAsyncBlock(
 			func() {
-				m.app.Listen("localhost:8080")
+				m.app.Listen(m.appAddr)
 			},
 			func() {
 				m.app.Shutdown(stdctx.TODO())

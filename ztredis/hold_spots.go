@@ -43,10 +43,13 @@ func (p *Pool) LockSpots(req *ztpbf.ReqPathSpots) (res *ztpbf.ReqPathSpots, err 
 	for _, v := range req.PathSpotsLeft {
 		para = append(para, v)
 	}
-	argv3 := req.ReqMinCount
-	if int(req.ReqMinCount) == len(req.PathSpotsLeft) { //argv3 == 0 表示一次性请求到所有剩余的点位，如果没有请求到则回退；
-		argv3 = 0 //len(req.PathNamesLeft)
+	argv3 := req.ReqMinCount //argv3 == 0 表示一次性请求到所有剩余的点位，如果没有请求到则回退；
+	if argv3 < 0 {
+		argv3 = 0
 	}
+	// if int(req.ReqMinCount) == len(req.PathSpotsLeft) {
+	// 	argv3 = 0 //len(req.PathNamesLeft)
+	// }
 	argv5 := 0
 	//没有请求到所有点，是移动指令，路径上有双向点
 	if req.HasTwoWay && len(req.PathSpotsLeft) > 1 {
